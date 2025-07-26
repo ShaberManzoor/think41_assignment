@@ -1,37 +1,44 @@
-import React, { useState } from "react";
-// import "./UserInput.css";
+import { useState } from "react";
+import { useChatStore } from "../store/useChatStore";
 
-type Props = {
-  onSend: (text: string) => void;
-};
+export default function UserInput() {
+  const [input, setInput] = useState("");
+  const { sessionId, addMessage, setLoading, setMessages, setSessionId } =
+    useChatStore();
 
-const UserInput: React.FC<Props> = ({ onSend }) => {
-  const [text, setText] = useState<string>("");
+  const sendMessage = async () => {
+    if (!input.trim()) return;
+    const userMsg = { role: "user", content: input } as const;
+    addMessage(userMsg);
+    setInput("");
+    setLoading(true);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!text.trim()) return;
-    onSend(text);
-    setText("");
+    const res = await fetch("http://localhost:8000/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: input, conversation_id: sessionId }),
+    });
+
+    const data = await res.json();
+    if (data.conversation_id) setSessionId(data.conversation_id);
+    setMessages(data.history);
+    setLoading(false);
   };
 
   return (
-    <form className="flex mt-4 gap-2" onSubmit={handleSubmit}>
+    <div className="flex items-center space-x-2">
       <input
-        type="text"
-        placeholder="Type your message..."
-        className="flex-1 border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        value={text}
-        onChange={(e) => setText(e.target.value)}
+        className="flex-1 p-2 border rounded"
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && sendMessage()}
       />
       <button
-        type="submit"
-        className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+        onClick={sendMessage}
+        className="px-4 py-2 bg-blue-500 text-white rounded"
       >
         Send
       </button>
-    </form>
+    </div>
   );
-};
-
-export default UserInput;
+}

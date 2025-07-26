@@ -1,15 +1,11 @@
-import { useState } from 'react'
-import './App.css'
-import ChatWindow from './components/ChatWindow'
+import ChatWindow from "./components/ChatWindow";
 
 function App() {
-  const [count, setCount] = useState(0)
-
   return (
-    <>
+    <div className="h-screen bg-gray-100">
       <ChatWindow />
-    </>
-  )
+    </div>
+  );
 }
 
-export default App
+export default App;

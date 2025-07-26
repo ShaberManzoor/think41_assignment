@@ -1,21 +1,14 @@
-import React from "react";
+
+import { useChatStore } from "../store/useChatStore";
 import Message from "./Message";
 
-type MessageProps = {
-  messages: {
-    sender: "user" | "ai";
-    text: string;
-  }[];
-};
-
-const MessageList: React.FC<MessageProps> = ({ messages }) => {
+export default function MessageList() {
+  const messages = useChatStore((s) => s.messages);
   return (
-    <div className="message-list">
-      {messages.map((msg, index) => (
-        <Message key={index} sender={msg.sender} text={msg.text} />
+    <div className="flex-1 overflow-y-auto space-y-2 mb-4">
+      {messages.map((msg, idx) => (
+        <Message key={idx} role={msg.role} content={msg.content} />
       ))}
     </div>
   );
-};
-
-export default MessageList;
+}

@@ -1,37 +1,26 @@
 import { create } from "zustand";
 
-type Message = {
-  id: string;
+interface Message {
   role: "user" | "assistant";
   content: string;
-};
+}
 
-type ChatState = {
+interface ChatStore {
   messages: Message[];
-  input: string;
   loading: boolean;
   sessionId: string | null;
-  history: { sessionId: string; createdAt: string }[];
-
-  setInput: (val: string) => void;
-  addMessage: (msg: Message) => void;
-  setLoading: (val: boolean) => void;
   setSessionId: (id: string) => void;
+  addMessage: (msg: Message) => void;
   setMessages: (msgs: Message[]) => void;
-  setHistory: (items: { sessionId: string; createdAt: string }[]) => void;
-};
+  setLoading: (val: boolean) => void;
+}
 
-export const useChatStore = create<ChatState>((set) => ({
+export const useChatStore = create<ChatStore>((set) => ({
   messages: [],
-  input: "",
   loading: false,
   sessionId: null,
-  history: [],
-
-  setInput: (val) => set({ input: val }),
-  addMessage: (msg) => set((state) => ({ messages: [...state.messages, msg] })),
-  setLoading: (val) => set({ loading: val }),
   setSessionId: (id) => set({ sessionId: id }),
+  addMessage: (msg) => set((state) => ({ messages: [...state.messages, msg] })),
   setMessages: (msgs) => set({ messages: msgs }),
-  setHistory: (items) => set({ history: items }),
+  setLoading: (val) => set({ loading: val }),
 }));

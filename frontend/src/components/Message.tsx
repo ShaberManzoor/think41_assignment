@@ -1,25 +1,18 @@
-import React from "react";
-// import "./Message.css";
-
-type Props = {
-  sender: "user" | "ai";
-  text: string;
-};
-
-const Message: React.FC<Props> = ({ sender, text }) => {
-  const isUser = sender === "user";
-
+export default function Message({
+  role,
+  content,
+}: {
+  role: "user" | "assistant";
+  content: string;
+}) {
+  const isUser = role === "user";
   return (
-    <div className={`flex mb-2 ${isUser ? "justify-end" : "justify-start"}`}>
-      <div
-        className={`max-w-xs p-3 rounded-lg ${
-          isUser ? "bg-blue-500 text-white" : "bg-gray-200 text-black"
-        }`}
-      >
-        {text}
-      </div>
+    <div
+      className={`p-3 rounded-xl max-w-xl ${
+        isUser ? "ml-auto bg-blue-100" : "mr-auto bg-white"
+      }`}
+    >
+      <p className="text-sm text-gray-800">{content}</p>
     </div>
   );
-};
-
-export default Message;
+}

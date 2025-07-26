@@ -1,68 +1,58 @@
-from fastapi import APIRouter, HTTPException
-from models import ChatRequest, ChatResponse, Message, ConversationSession
+from fastapi import APIRouter, Body
+from models import Message, ChatSession
 from db import db
-from datetime import datetime
-import uuid
-from utils.llm import get_llm_response
+from uuid import uuid4
+import httpx
+import os
 
-router = APIRouter()
+chat_router = APIRouter()
 
-@router.post("/api/chat", response_model=ChatResponse)
-async def chat_api(request: ChatRequest):
-    # Generate new session_id if not provided
-    session_id = request.session_id or str(uuid.uuid4())
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 
-    # Check if session exists
-    session = await db["sessions"].find_one({"session_id": session_id})
+@chat_router.post("/chat")
+async def chat(user_id: str = Body(...), message: str = Body(...), conversation_id: Optional[str] = Body(None)):
+    session = None
+
+    if conversation_id:
+        session = await db.sessions.find_one({"_id": conversation_id})
     
     if not session:
-        # If session doesn't exist, create a new one
-        session_data = {
-            "user_id": request.user_id,
-            "session_id": session_id,
-            "started_at": datetime.utcnow(),
+        conversation_id = str(uuid4())
+        session = {
+            "_id": conversation_id,
+            "user_id": user_id,
             "messages": []
         }
-        await db["sessions"].insert_one(session_data)
+        await db.sessions.insert_one(session)
 
-    # Create the user message
-    user_msg = {"role": "user", "content": request.message}
+    user_msg = {"role": "user", "content": message}
+    session["messages"].append(user_msg)
 
-    # Add user message to the session
-    await db["sessions"].update_one(
-        {"session_id": session_id},
-        {"$push": {"messages": user_msg}}
-    )
+    # Call LLM (Groq or mock)
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.post(
+                GROQ_API_URL,
+                headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
+                json={
+                    "model": "mixtral-8x7b-32768",
+                    "messages": session["messages"][-10:],
+                    "temperature": 0.7
+                }
+            )
+            data = response.json()
+            ai_response = data["choices"][0]["message"]
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
 
-    # Fetch full session to build LLM prompt
-    session = await db["sessions"].find_one({"session_id": session_id})
-    prompt = "You are a helpful assistant for an e-commerce website. Use the conversation below to understand the context and assist the user appropriately.\n\n"
+    session["messages"].append(ai_response)
+    await db.sessions.update_one({"_id": conversation_id}, {"$set": {"messages": session["messages"]}})
 
-    for message in session["messages"]:
-        prompt += f"{message['role'].capitalize()}: {message['content']}\n"
+    return {"conversation_id": conversation_id, "messages": session["messages"]}
 
-    prompt += "Assistant:"
 
-    # Get LLM response from Groq
-    try:
-        ai_reply = await get_llm_response(prompt)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"LLM Error: {str(e)}")
-
-    # Create assistant message
-    ai_msg = {"role": "assistant", "content": ai_reply}
-
-    # Save assistant message
-    await db["sessions"].update_one(
-        {"session_id": session_id},
-        {"$push": {"messages": ai_msg}}
-    )
-
-    # Return response
-    return ChatResponse(session_id=session_id, response=ai_reply)
-
-# Optional: Fetch all sessions for a user
-@router.get("/api/sessions/{user_id}")
-async def get_sessions_for_user(user_id: str):
-    sessions = await db["sessions"].find({"user_id": user_id}).to_list(length=100)
+@chat_router.get("/history/{user_id}")
+async def get_conversations(user_id: str):
+    sessions = await db.sessions.find({"user_id": user_id}).to_list(100)
     return sessions
